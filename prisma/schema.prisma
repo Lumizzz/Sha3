@@ -1,0 +1,259 @@
+// Harmonia Bot — Prisma Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  relationMode      = "prisma"
+}
+
+model User {
+  id            String   @id
+  username      String
+  discriminator String   @default("0")
+  avatar        String?
+  email         String?  @unique
+  isPremium     Boolean  @default(false)
+  isOwner       Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  playlists    Playlist[]
+  favorites    Favorite[]
+  musicHistory MusicHistory[]
+  commandLogs  CommandLog[]
+  auditLogs    AuditLog[]
+}
+
+model Guild {
+  id          String   @id
+  name        String
+  icon        String?
+  ownerId     String
+  memberCount Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  settings        GuildSettings?
+  playlists       Playlist[]
+  musicHistory    MusicHistory[]
+  commandLogs     CommandLog[]
+  auditLogs       AuditLog[]
+  requestChannels RequestChannel[]
+}
+
+model GuildSettings {
+  id                  String         @id @default(cuid())
+  guildId             String         @unique
+  guild               Guild          @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  defaultVolume       Int            @default(80)
+  maxVolume           Int            @default(150)
+  defaultLoop         LoopMode       @default(OFF)
+  autoplay            Boolean        @default(false)
+  stay247             Boolean        @default(false)
+  djRoleIds           String[]       @default([])
+  djOnlyMode          Boolean        @default(false)
+  restrictedRoleIds   String[]       @default([])
+  voteSkipEnabled     Boolean        @default(true)
+  voteSkipThreshold   Float          @default(0.5)
+  embedColor          String         @default("#5865F2")
+  embedMode           EmbedMode      @default(NORMAL)
+  announceSongChannel String?
+  announceSongEnabled Boolean        @default(false)
+  maxQueueSize        Int            @default(500)
+  maxSongDuration     Int            @default(0)
+  searchProvider      SearchProvider @default(YOUTUBE_MUSIC)
+  language            String         @default("en")
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+}
+
+model RequestChannel {
+  id        String   @id @default(cuid())
+  guildId   String
+  guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  channelId String
+  messageId String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([guildId, channelId])
+}
+
+model Playlist {
+  id          String          @id @default(cuid())
+  name        String
+  description String?
+  thumbnail   String?
+  isPublic    Boolean         @default(false)
+  isGuild     Boolean         @default(false)
+  guildId     String?
+  guild       Guild?          @relation(fields: [guildId], references: [id], onDelete: SetNull)
+  userId      String
+  user        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sourceType  SourceType      @default(CUSTOM)
+  externalId  String?
+  externalUrl String?
+  trackCount  Int             @default(0)
+  tracks      PlaylistTrack[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([userId])
+  @@index([guildId])
+}
+
+model PlaylistTrack {
+  id          String     @id @default(cuid())
+  playlistId  String
+  playlist    Playlist   @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  position    Int
+  title       String
+  author      String
+  duration    Int
+  thumbnail   String?
+  uri         String
+  sourceType  SourceType
+  originalUri String?
+  isrc        String?
+  artworkUrl  String?
+  addedAt     DateTime   @default(now())
+
+  @@unique([playlistId, position])
+  @@index([playlistId])
+}
+
+model Favorite {
+  id         String     @id @default(cuid())
+  userId     String
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title      String
+  author     String
+  duration   Int
+  thumbnail  String?
+  uri        String
+  sourceType SourceType
+  isrc       String?
+  artworkUrl String?
+  addedAt    DateTime   @default(now())
+
+  @@unique([userId, uri])
+  @@index([userId])
+}
+
+model MusicHistory {
+  id             String     @id @default(cuid())
+  guildId        String
+  guild          Guild      @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  author         String
+  duration       Int
+  thumbnail      String?
+  uri            String
+  sourceType     SourceType
+  isrc           String?
+  playedAt       DateTime   @default(now())
+  durationPlayed Int        @default(0)
+
+  @@index([guildId])
+  @@index([playedAt])
+}
+
+model CommandLog {
+  id        String   @id @default(cuid())
+  guildId   String
+  guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  command   String
+  args      Json?
+  success   Boolean  @default(true)
+  errorMsg  String?
+  latencyMs Int?
+  createdAt DateTime @default(now())
+
+  @@index([guildId])
+  @@index([command])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  guildId   String
+  guild     Guild    @relation(fields: [guildId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@index([guildId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  @@unique([provider, providerAccountId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+enum LoopMode {
+  OFF
+  TRACK
+  QUEUE
+}
+
+enum EmbedMode {
+  NORMAL
+  MINIMAL
+  COMPACT
+  NIGHT
+}
+
+enum SearchProvider {
+  YOUTUBE
+  YOUTUBE_MUSIC
+  SPOTIFY_FALLBACK
+}
+
+enum SourceType {
+  YOUTUBE
+  YOUTUBE_MUSIC
+  SPOTIFY
+  APPLE_MUSIC
+  SOUNDCLOUD
+  TWITCH
+  HTTP
+  CUSTOM
+}
